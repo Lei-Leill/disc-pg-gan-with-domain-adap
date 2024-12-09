@@ -276,18 +276,18 @@ def train(): #, loss_filename):#, output_filename=None):
 
         # set up CNN model
         print("num haps", neutral_iterator.num_samples)
-        model = discriminator.OnePopModel(neutral_iterator.num_samples)
 
         # training params
         cross_entropy =tf.keras.losses.BinaryCrossentropy(from_logits=True)
         optimizer = tf.keras.optimizers.Adam()
-
+        print(123)
         # train and validation data
         training_generator = SlimSequence(neutral_iterator, sel_iterators, True, batch_size=global_vars.BATCH_SIZE)
         validation_generator = SlimSequence(neutral_iterator, sel_iterators, False)
-
+        print("Generator done")
+        model = discriminator.OnePopModel(neutral_iterator.num_samples)
         model.compile(optimizer=optimizer, loss=cross_entropy, metrics=['accuracy'])
-        #model = create_custom_grl_model()
+        #model = discriminator.create_custom_grl_model()
         model.fit_generator(generator=training_generator,
                             validation_data=validation_generator, epochs=10)
         #model.save("models/SLiM_model")

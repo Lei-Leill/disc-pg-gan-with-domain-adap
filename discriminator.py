@@ -8,7 +8,7 @@ Date: 2/4/21
 import tensorflow as tf
 
 from tensorflow.keras.layers import Dense, Flatten, Conv1D, Conv2D, \
-    MaxPooling2D, AveragePooling1D, Dropout, Concatenate, Layer
+    MaxPooling2D, AveragePooling1D, Dropout, Concatenate, Layer, Input
 from tensorflow.keras import Model
 
 
@@ -37,12 +37,12 @@ def create_custom_grl_model(dropout_rate=0.5):
     # Convolutional layers with pooling
     x = Conv2D(32, (1, 5), activation='relu')(inputs)
     print(f"After Conv2D (32 filters): {x.shape}")
-    x = MaxPool2D(pool_size=(1, 2), strides=(1, 2))(x)
+    x = MaxPooling2D(pool_size=(1, 2), strides=(1, 2))(x)
     print(f"After MaxPooling2D: {x.shape}")
 
     x = Conv2D(64, (1, 5), activation='relu')(x)
     print(f"After Conv2D (64 filters): {x.shape}")
-    x = MaxPool2D(pool_size=(1, 2), strides=(1, 2))(x)
+    x = MaxPooling2D(pool_size=(1, 2), strides=(1, 2))(x)
     print(f"After MaxPooling2D: {x.shape}")
 
     # Apply reduction (permutation-invariant function)
@@ -56,13 +56,12 @@ def create_custom_grl_model(dropout_rate=0.5):
     x = Dropout(dropout_rate)(x)
     class_output = Dense(1, activation='sigmoid', name='classifier')(x)
 
-    '''
+    
     # Discriminator pathway with Gradient Reversal Layer
-    disc_x = GradReverse()(x)
+    disc_x = GradientReversalLayer()(x)
     disc_x = Dense(1024, activation='relu')(disc_x)
     disc_x = Dense(512, activation='relu')(disc_x)
     disc_output = Dense(1, activation='sigmoid', name='discriminator')(disc_x)
-
     
     # Build and compile the model
     model = Model(inputs=inputs, outputs=[class_output, disc_output])
@@ -70,6 +69,7 @@ def create_custom_grl_model(dropout_rate=0.5):
                   loss=[custom_loss, custom_loss],
                   loss_weights=[1, 1],
                   metrics=['accuracy'])
+    return model
     '''
     # Build and compile the model
     model = Model(inputs=inputs, outputs=[class_output])
@@ -77,6 +77,7 @@ def create_custom_grl_model(dropout_rate=0.5):
                   loss=[custom_loss],
                   metrics=['accuracy'])
     return model
+    '''
     
 
 class OnePopModel(Model):
@@ -84,6 +85,7 @@ class OnePopModel(Model):
 
     def __init__(self, pop, saved_model=None):
         super(OnePopModel, self).__init__()
+        print("Constructor")
 
         if saved_model is None:
             # it is (1,5) for permutation invariance (shape is n X SNPs)
