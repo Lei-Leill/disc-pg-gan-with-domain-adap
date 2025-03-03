@@ -36,7 +36,7 @@ import generator
 
 #SLIM_DATA = "/bigdata/smathieson/pg-gan/1000g/SLiM/Aug23/" + TRAIN_POP + "_" + SEL_TYPE + "/"
 #SLIM_DATA = "/bigdata/smathieson/1000g-share/SLiM/" + TRAIN_POP + "_" + SEL_TYPE + "/"
-SLIM_DATA = "../data/SLiM/" 
+SLIM_DATA = "../data/1000g/" 
 
 NEUTRAL = "neutral"
 SELECTION = ["sel_01", "sel_025", "sel_05", "sel_10"]
@@ -49,11 +49,10 @@ def parse_args():
     parser = optparse.OptionParser(description='Dataset and loss function to train cnn model')
     
     parser.add_option('-d', '--dataset', type='choice', choices=["SLiM", "msprime"], help='Enter one dataset (SLiM / msprime)')
-    parser.add_option('-l', '--loss', type='choice', choices=["Entropy", "MSE"], help='Enter loss function (Entropy / MSE)')
 
     (opts, args) = parser.parse_args()
 
-    mandatories = ['dataset', 'loss']
+    mandatories = ['dataset']
     for m in mandatories:
         if not opts.__dict__[m]:
             print('mandatory option ' + m + ' is missing\n')
@@ -266,11 +265,10 @@ def train(): #, loss_filename):#, output_filename=None):
     options = parse_args()
     print(options)
     dataset = options.dataset
-    loss = options.loss
-    print(dataset, loss)
 
     if dataset == 'SLiM':
         # SLiM data
+        '''
         neutral_iterator = SlimIterator(SLIM_DATA + NEUTRAL)
         sel_iterators = [SlimIterator(SLIM_DATA + sel) for sel in SELECTION]
 
@@ -280,16 +278,35 @@ def train(): #, loss_filename):#, output_filename=None):
         # training params
         cross_entropy =tf.keras.losses.BinaryCrossentropy(from_logits=True)
         optimizer = tf.keras.optimizers.Adam()
-        print(123)
         # train and validation data
         training_generator = SlimSequence(neutral_iterator, sel_iterators, True, batch_size=global_vars.BATCH_SIZE)
-        validation_generator = SlimSequence(neutral_iterator, sel_iterators, False)
+        validation_generator = SlimSequence(neutral_iterator, sel_iterators, False)'''
+        
+        TRAIN = "CEU/"
+        VAL = "YRI/"
+        train_neutral_iterator = SlimIterator(SLIM_DATA + TRAIN + NEUTRAL)
+        train_sel_iterators = [SlimIterator(SLIM_DATA + TRAIN + sel) for sel in SELECTION]
+
+        val_neutral_iterator = SlimIterator(SLIM_DATA + VAL+ NEUTRAL)
+        val_sel_iterators = [SlimIterator(SLIM_DATA + VAL + sel) for sel in SELECTION]
+
+        # set up CNN model
+        print("num haps", train_neutral_iterator.num_samples)
+        print("num haps", val_neutral_iterator.num_samples)
+        # training params
+        cross_entropy =tf.keras.losses.BinaryCrossentropy(from_logits=True)
+        optimizer = tf.keras.optimizers.Adam()
+        # train and validation data
+        training_generator = SlimSequence(train_neutral_iterator, train_sel_iterators, True, batch_size=global_vars.BATCH_SIZE)
+        validation_generator = SlimSequence(val_neutral_iterator, val_sel_iterators, False)
+        
         print("Generator done")
-        model = discriminator.OnePopModel(neutral_iterator.num_samples)
-        model.compile(optimizer=optimizer, loss=cross_entropy, metrics=['accuracy'])
-        #model = discriminator.create_custom_grl_model()
-        model.fit_generator(generator=training_generator,
-                            validation_data=validation_generator, epochs=10)
+        #model = discriminator.OnePopModel(train_neutral_iterator.num_samples)
+        #model.compile(optimizer=optimizer, loss=cross_entropy, metrics=['accuracy'])
+        model = discriminator.create_custom_grl_model()
+        #model.fit_generator(generator=training_generator, validation_data=validation_generator, epochs=10, verbose = 0)
+        model.fit(training_generator, validation_data=validation_generator, epochs=10, verbose = 2)
+
         #model.save("models/SLiM_model")
     
     elif dataset == 'msprime':

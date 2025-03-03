@@ -8,7 +8,7 @@ Date: 2/4/21
 import tensorflow as tf
 
 from tensorflow.keras.layers import Dense, Flatten, Conv1D, Conv2D, \
-    MaxPooling2D, AveragePooling1D, Dropout, Concatenate, Layer, Input
+    MaxPooling2D, AveragePooling1D, Dropout, Concatenate, Layer, Input, BatchNormalization, Activation
 from tensorflow.keras import Model
 
 
@@ -29,55 +29,54 @@ def custom_loss(y_true, y_pred):
     y_true = tf.boolean_mask(y_true, tf.not_equal(y_true, -1))
     return tf.keras.losses.binary_crossentropy(y_true, y_pred)
 
-def create_custom_grl_model(dropout_rate=0.5):
+def create_custom_grl_model():
     input_dims = [40, 36, 2] # channel last
     inputs = Input(shape=input_dims)
-    print(f"Input shape: {inputs.shape}")
 
     # Convolutional layers with pooling
     x = Conv2D(32, (1, 5), activation='relu')(inputs)
-    print(f"After Conv2D (32 filters): {x.shape}")
+    #x = BatchNormalization()(x)  # Helps domain confusion
     x = MaxPooling2D(pool_size=(1, 2), strides=(1, 2))(x)
-    print(f"After MaxPooling2D: {x.shape}")
 
     x = Conv2D(64, (1, 5), activation='relu')(x)
-    print(f"After Conv2D (64 filters): {x.shape}")
+    #x = BatchNormalization()(x)  # Helps reduce domain-specific bias
     x = MaxPooling2D(pool_size=(1, 2), strides=(1, 2))(x)
-    print(f"After MaxPooling2D: {x.shape}")
 
-    # Apply reduction (permutation-invariant function)
     x = tf.reduce_sum(x, axis=1)
-    
-    # Flatten and fully connected layers for classification
     x = Flatten()(x)
-    x = Dense(1024, activation='relu')(x)
-    x = Dropout(dropout_rate)(x)
-    x = Dense(512, activation='relu')(x)
-    x = Dropout(dropout_rate)(x)
-    class_output = Dense(1, activation='sigmoid', name='classifier')(x)
 
-    
+    '''
     # Discriminator pathway with Gradient Reversal Layer
     disc_x = GradientReversalLayer()(x)
     disc_x = Dense(1024, activation='relu')(disc_x)
     disc_x = Dense(512, activation='relu')(disc_x)
     disc_output = Dense(1, activation='sigmoid', name='discriminator')(disc_x)
-    
+    '''
+
+    ### domain discriminator
+    discriminator = GradientReversalLayer()(x)
+    discriminator = Dense(1024, use_bias=False)(discriminator)
+    discriminator = BatchNormalization()(discriminator)
+    discriminator = Activation('relu')(discriminator)
+
+    discriminator = Dense(512, activation="relu")(discriminator)
+    disc_output = Dense(1, activation='sigmoid', name='discriminator')(discriminator)
+
+
+    # Classifier Label Layer, tested to work properly as the OnePop Model
+    x = Dense(128, activation = 'relu')(x)
+    x = Dropout(rate = 0.5)(x)
+    x = Dense(128, activation = 'relu')(x)
+    x = Dropout(rate = 0.5)(x)
+    class_output = Dense(1, activation = 'sigmoid', name='classifier')(x)
+
     # Build and compile the model
     model = Model(inputs=inputs, outputs=[class_output, disc_output])
     model.compile(optimizer='adam',
                   loss=[custom_loss, custom_loss],
                   loss_weights=[1, 1],
                   metrics=['accuracy'])
-    return model
-    '''
-    # Build and compile the model
-    model = Model(inputs=inputs, outputs=[class_output])
-    model.compile(optimizer='adam',
-                  loss=[custom_loss],
-                  metrics=['accuracy'])
-    return model
-    '''
+    return model    
     
 
 class OnePopModel(Model):
