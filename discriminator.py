@@ -30,7 +30,8 @@ def custom_loss(y_true, y_pred):
     return tf.keras.losses.binary_crossentropy(y_true, y_pred)
 
 def create_custom_grl_model():
-    input_dims = [40, 36, 2] # channel last
+    #input_dims = [40, 36, 2] # channel last
+    input_dims = [198, 36, 2]
     inputs = Input(shape=input_dims)
 
     # Convolutional layers with pooling

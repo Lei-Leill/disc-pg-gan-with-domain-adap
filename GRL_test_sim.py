@@ -4,6 +4,8 @@ import numpy as np
 import random
 import sys, optparse
 import tensorflow as tf
+from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay
+import matplotlib.pyplot as plt
 
 # our imports
 import discriminator
@@ -19,6 +21,35 @@ SLIM_DATA = "../data/1000g/"
 NEUTRAL = "neutral"
 SELECTION = ["sel_01", "sel_025", "sel_05", "sel_10"]
 BATCH_PER_EPOCH = 200 # arbitrary 
+
+def evaluate_model(model, validation_generator):
+    print("into the function")
+    # Get predictions from the model
+    y_true = []
+    y_pred = []
+
+    for data, labels in validation_generator:
+        # Get the true labels for the classifier
+        y_true_batch = labels['classifier']
+        y_pred_batch = model.predict(data) # Predict with the model
+        
+        y_pred_batch = (y_pred_batch[0] > 0.5).astype(int)
+
+        # Append true and predicted labels
+        y_true.extend(y_true_batch.flatten())
+        y_pred.extend(y_pred_batch.flatten())
+
+    # Generate the confusion matrix
+    cm = confusion_matrix(y_true, y_pred)
+
+    # Plotting the confusion matrix using matplotlib and seaborn
+    plt.figure(figsize=(6, 5))
+    disp = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=["Neutral","Selected"])
+    disp.plot()
+    plt.xlabel('Predicted labels')
+    plt.ylabel('True labels')
+    plt.title('Confusion Matrix')
+    plt.savefig("Confusion Matrix for Classifier Matrix")
 
 class TrainingSeq(keras.utils.Sequence):
 
@@ -66,7 +97,7 @@ class TrainingSeq(keras.utils.Sequence):
             disc_labels = np.ones((num_neutral + num_sel,1))
 
             # don't need to shuffle
-    
+        #print(f"Data shape: {regions.shape}, Class labels shape: {class_labels.shape}, Disc labels shape{disc_labels.shape}")
         return regions, {"classifier": class_labels, "discriminator": disc_labels}
 
     def mixed_sel_batch(self, num_regions, sel_iterators):
@@ -108,14 +139,29 @@ def main(): #, loss_filename):#, output_filename=None):
     #model = discriminator.OnePopModel(train_neutral_iterator.num_samples)
     #model.compile(optimizer=optimizer, loss=cross_entropy, metrics=['accuracy'])
     model = discriminator.create_custom_grl_model()
-    model.fit_generator(generator=training_generator,
-                        validation_data=validation_generator, epochs=10, verbose = 2)
+    history = model.fit(training_generator, validation_data=validation_generator, epochs=20, verbose = 2)
+     # Plot accuracy over time (for training and validation)
+    
+    #print(history.history)
 
-    #model.save("models/SLiM_model")
+    plt.plot(history.history['discriminator_accuracy'], label='Training Accuracy')
+    plt.plot(history.history['discriminator_loss'], label='Training Loss')
+    plt.xlabel('Epochs')
+    plt.ylabel('Training Accuracy')
+    plt.title('Model Accuracy over Time')
+    plt.legend()
+    plt.savefig('Disc_Train_Accuracy_vs_Epoch.pdf')
+
+    plt.clf()
+    plt.plot(history.history['classifier_accuracy'], label='Training Accuracy')
+    plt.plot(history.history['val_classifier_accuracy'], label='Testing Accuracy')
+    plt.xlabel('Epochs')
+    plt.ylabel('Accuracy')
+    plt.title('Classifier Accuracy (Train, Test) over Time')
+    plt.legend()
+    plt.savefig('Class_Train_Test_Accuracy_vs_Epoch.pdf')
+    evaluate_model(model, validation_generator)
 
 
 if __name__ == "__main__":
     main()
-        
-
-

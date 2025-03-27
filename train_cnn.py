@@ -301,9 +301,9 @@ def train(): #, loss_filename):#, output_filename=None):
         validation_generator = SlimSequence(val_neutral_iterator, val_sel_iterators, False)
         
         print("Generator done")
-        #model = discriminator.OnePopModel(train_neutral_iterator.num_samples)
-        #model.compile(optimizer=optimizer, loss=cross_entropy, metrics=['accuracy'])
-        model = discriminator.create_custom_grl_model()
+        model = discriminator.OnePopModel(train_neutral_iterator.num_samples)
+        model.compile(optimizer=optimizer, loss=cross_entropy, metrics=['accuracy'])
+        #model = discriminator.create_custom_grl_model()
         #model.fit_generator(generator=training_generator, validation_data=validation_generator, epochs=10, verbose = 0)
         model.fit(training_generator, validation_data=validation_generator, epochs=10, verbose = 2)
 
