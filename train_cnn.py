@@ -12,6 +12,8 @@ import numpy as np
 import random
 import sys, optparse
 import tensorflow as tf
+import matplotlib.pyplot as plt
+from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay
 
 
 # our imports
@@ -69,6 +71,73 @@ def accuracy(y_true, y_pred): # y_pred is probabilities, use 0.5 threshold
         if int(y_true[i][0]) == result:
             a += 1
     return a/len(y_true)
+
+def evaluate_model(model, validation_generator):
+    # plotting the confusion matrix for the testing data
+    y_true = []
+    y_pred = []
+
+    for data, labels in validation_generator:
+        # Get the true labels for the classifier
+        y_true_batch = labels
+        y_pred_batch = model.predict(data) # Predict with the model
+        
+        y_pred_batch = (y_pred_batch > 0.5).astype(int)
+
+        # Append true and predicted labels
+        y_true.extend(y_true_batch.flatten())
+        y_pred.extend(y_pred_batch.flatten())
+
+    # Generate the confusion matrix
+    cm = confusion_matrix(y_true, y_pred)
+
+    # Plotting the confusion matrix using matplotlib and seaborn
+    plt.figure(figsize=(6, 5))
+    disp = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=["Neutral","Selected"])
+    disp.plot()
+    plt.xlabel('Predicted labels')
+    plt.ylabel('True labels')
+    plt.title('Confusion Matrix')
+    plt.savefig("Without_GRL_Confusion Matrix for Classifier Matrix.pdf")
+
+def accuracy_bar_chart(model, validation_generator):
+    import matplotlib.pyplot as plt
+
+    sel_groups = ["neutral", "sel_01", "sel_025", "sel_05", "sel_10"]
+    group_correct = {g: 0 for g in sel_groups}
+    group_total = {g: 0 for g in sel_groups}
+
+    # Go through the validation generator
+    for data, labels in validation_generator:
+        y_true_batch = labels.flatten()
+        y_pred_batch = (model.predict(data) > 0.5).astype(int).flatten()
+
+        # Now we split the data according to the ordering in validation_generator:
+        # This ordering is: [neutral, sel_01, sel_025, sel_05, sel_10]
+        num_samples_per_group = len(y_true_batch) // len(sel_groups)
+        for i, group in enumerate(sel_groups):
+            start = i * num_samples_per_group
+            end = start + num_samples_per_group
+
+            y_true = y_true_batch[start:end]
+            y_pred = y_pred_batch[start:end]
+
+            group_correct[group] += np.sum(y_true == y_pred)
+            group_total[group] += len(y_true)
+
+    # Compute accuracy per group
+    accuracies = {g: group_correct[g] / group_total[g] for g in sel_groups}
+
+    print(accuracies)
+    # Plotting
+    plt.figure(figsize=(8, 5))
+    plt.bar(accuracies.keys(), accuracies.values())
+    plt.ylim(0, 1)
+    plt.ylabel("Accuracy")
+    plt.xlabel("Selection Group")
+    plt.title("Classifier Accuracy per Selection Group")
+    plt.savefig("Accuracy_per_Selection_Group.pdf")
+    plt.show()
 
 class SlimSequence(keras.utils.Sequence):
 
@@ -305,8 +374,19 @@ def train(): #, loss_filename):#, output_filename=None):
         model.compile(optimizer=optimizer, loss=cross_entropy, metrics=['accuracy'])
         #model = discriminator.create_custom_grl_model()
         #model.fit_generator(generator=training_generator, validation_data=validation_generator, epochs=10, verbose = 0)
-        model.fit(training_generator, validation_data=validation_generator, epochs=10, verbose = 2)
+        history = model.fit(training_generator, validation_data=validation_generator, epochs=10, verbose = 2)
 
+        # plotting
+        plt.plot(history.history['accuracy'], label='Training Accuracy')
+        plt.plot(history.history['val_accuracy'], label='Testing Accuracy')
+        plt.xlim(left=1)
+        plt.xlabel('Epochs')
+        plt.ylabel('Accuracy')
+        plt.title('Classifier Accuracy (Train, Test) over Time')
+        plt.legend()
+        plt.savefig('Without_GRL_Class_Train_Test_Accuracy_vs_Epoch.pdf')
+        evaluate_model(model, validation_generator)
+        accuracy_bar_chart(model, validation_generator)
         #model.save("models/SLiM_model")
     
     elif dataset == 'msprime':
@@ -323,11 +403,12 @@ def train(): #, loss_filename):#, output_filename=None):
         training_generator = GeneratorSequence(True, batch_size=global_vars.BATCH_SIZE)
         validation_generator = GeneratorSequence(False)
 
-        model.fit_generator(generator=training_generator,
+        history = model.fit_generator(generator=training_generator,
                             validation_data=validation_generator, epochs=10)
-        model.save("models/5000(0)_10000(1)_model")
-    
+        #model.save("models/5000(0)_10000(1)_model")
 
+
+    
 
         
 

@@ -119,7 +119,7 @@ class SlimIterator:
     def test_batch(self):
         num_test = int(len(self.matrices)*TEST_FRAC)
         regions = np.zeros((num_test, self.num_samples, global_vars.NUM_SNPS, 2), dtype=np.float32)
-
+        #print(f"Number of test is {num_test}")
         for i in range(num_test):
             regions[i] = self.real_region(True, index=i) # neg 1 true
 

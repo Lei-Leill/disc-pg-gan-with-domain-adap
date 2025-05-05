@@ -29,6 +29,27 @@ def custom_loss(y_true, y_pred):
     y_true = tf.boolean_mask(y_true, tf.not_equal(y_true, -1))
     return tf.keras.losses.binary_crossentropy(y_true, y_pred)
 
+
+def accuracy(y_true, y_pred):
+    """
+    Custom accuracy metric that ignores -1 labels in y_true.
+    Assumes y_pred is probabilities or logits.
+    """
+    y_true = tf.reshape(y_true, [-1])
+    y_pred = tf.reshape(y_pred, [-1])
+
+    # Mask out invalid labels
+    mask = tf.not_equal(y_true, -1)
+    y_true = tf.boolean_mask(y_true, mask)
+    y_pred = tf.boolean_mask(y_pred, mask)
+
+    # Threshold predictions at 0.5
+    y_pred_labels = tf.cast(y_pred > 0.5, tf.float32)
+
+    # Compute accuracy
+    accuracy = tf.reduce_mean(tf.cast(tf.equal(y_true, y_pred_labels), tf.float32))
+    return accuracy
+
 def create_custom_grl_model():
     #input_dims = [40, 36, 2] # channel last
     input_dims = [198, 36, 2]
@@ -76,7 +97,8 @@ def create_custom_grl_model():
     model.compile(optimizer='adam',
                   loss=[custom_loss, custom_loss],
                   loss_weights=[1, 1],
-                  metrics=['accuracy'])
+                  metrics={'classifier': [accuracy],
+                            'discriminator': [accuracy]})
     return model    
     
 
