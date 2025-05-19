@@ -1,4 +1,4 @@
-# Progress Writeup Throughout the Semester
+# Progress Writeup 
 
 ## CNN with GRL Layer Testing
 - Tested and verified functionality of CNN with GRL layer to ensure it meets performance expectations.
