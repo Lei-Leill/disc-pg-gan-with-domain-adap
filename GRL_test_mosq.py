@@ -55,32 +55,41 @@ class Seq(keras.utils.Sequence):
 
     def __getitem__(self, idx):
         if self.train:
-            half = self.batch_size // 4
+            quart = self.batch_size // 4
+            if self.with_GRL and self.test_mosq:
+                size = quart
+            else: size = quart * 2
 
             # Simulated data
-            train_neutral_regions = self.train_neutral_iterator.real_batch(batch_size=half)
-            train_sel_regions = self.mixed_sel_batch(half, self.train_sel_iterator)
-
-            # Simulated mosquito data
-            test_mos_regions = self.test_mosq.simulate_batch(batch_size=half * 2)
-
-            # Combine all
-            regions = np.concatenate((train_neutral_regions, train_sel_regions, test_mos_regions), axis=0)
+            train_neutral_regions = self.train_neutral_iterator.real_batch(batch_size=size)
+            train_sel_regions = self.mixed_sel_batch(size, self.train_sel_iterator)
 
             # Labels
-            class_labels = np.concatenate((
-                np.zeros((half, 1)),           # Neutral: 0
-                np.ones((half, 1)),            # Selected: 1
-                -1 * np.ones((half * 2, 1))     # Simulated mosquito data: unlabeled
-            ), axis=0)
+            if self.with_GRL and self.test_mosq: # the case of GBR layer 
+                 # Simulated mosquito data
+                test_mos_regions = self.test_mosq.simulate_batch(batch_size=quart * 2)
+                regions = np.concatenate((train_neutral_regions, train_sel_regions, test_mos_regions), axis=0) # combine together
+
+                class_labels = np.concatenate((
+                    np.zeros((quart, 1)),           # Neutral: 0
+                    np.ones((quart, 1)),            # Selected: 1
+                    -1 * np.ones((quart * 2, 1))     # Simulated mosquito data: unlabeled
+                ), axis=0)
+            else:
+                regions = np.concatenate((train_neutral_regions, train_sel_regions), axis=0) # combine together
+
+                class_labels = np.concatenate((
+                    np.zeros((quart*2, 1)),           # Neutral: 0
+                    np.ones((quart*2, 1)),            # Selected: 1
+                ), axis=0)
 
             disc_labels = np.concatenate((
-                np.zeros((half * 2, 1)),       # Real data (neutral + selected): 0
-                np.ones((half * 2, 1))         # Simulated mosquito: 1
+                np.zeros((quart * 2, 1)),       # Real data (neutral + selected): 0
+                np.ones((quart * 2, 1))         # Simulated mosquito: 1
             ), axis=0)
 
             # Shuffle
-            total = 4 * half
+            total = 4 * quart
             idx = np.random.permutation(total)
             regions, class_labels, disc_labels = regions[idx], class_labels[idx], disc_labels[idx]
 
@@ -106,71 +115,6 @@ class Seq(keras.utils.Sequence):
         sel_regions.append(random.choice(sel_iterators).real_batch(batch_size=remainder))
 
         return np.concatenate(sel_regions, axis=0)
-
-"""def plotting(history, with_GRL):
-    if with_GRL:
-        file_path = f'figs/Mosq/withGRL/'
-    else:  file_path = f'figs/Mosq/withoutGRL/'
-    os.makedirs(file_path, exist_ok=True)
-    
-    if with_GRL:
-        plt.clf()
-        epochs = range(1, len(train_acc) + 1)
-        train_acc = history.history['classifier_accuracy']
-        val_acc = history.history['val_classifier_accuracy']
-        plt.plot(epochs, train_acc, label='Training Accuracy')
-        plt.plot(epochs, val_acc, label='Testing Accuracy')
-        plt.xlim(left=1)
-        plt.xlabel('Epochs')
-        plt.ylabel('Accuracy')
-        plt.title('Classifier Accuracy (Train, Test) over Time')
-        plt.legend()
-        for i, (tr, val) in enumerate(zip(train_acc, val_acc), start=1):
-            plt.text(i, tr + 0.005, f'{tr:.2f}', ha='center', va='bottom', fontsize=8)
-            plt.text(i, val - 0.015, f'{val:.2f}', ha='center', va='top', fontsize=8)
-        plt.savefig(f"{file_path}Classifier_Accuracy.pdf")
-        
-        plt.clf()
-        plt.plot(history.history['classifier_loss'], label='Training Loss')
-        plt.plot(history.history['val_classifier_loss'], label='Testing Loss')
-        plt.xlim(left=1)
-        plt.xlabel('Epochs')
-        plt.ylabel('Accuracy')
-        plt.title('Classifier Loss (Train, Test) over Time')
-        plt.legend()
-        plt.savefig(f"{file_path}Classifier_Loss.pdf")
-
-        plt.clf() # expected the accuracy will decrease to around 0.5
-        plt.plot(history.history['discriminator_accuracy'], label='Training Accuracy')
-        plt.plot(history.history['discriminator_loss'], label='Training Loss')
-        plt.xlim(left=1)
-        plt.xlabel('Epochs')
-        plt.ylabel('Training Accuracy')
-        plt.title('Model Accuracy over Time')
-        plt.legend()
-        plt.savefig(f'{file_path}Disc_Acc_Loss.pdf')
-    else:
-        plt.clf()
-        plt.plot(history.history['accuracy'], label='Training Accuracy')
-        plt.plot(history.history['val_accuracy'], label='Testing Accuracy')
-        plt.xlim(left=1)
-        plt.xlabel('Epochs')
-        plt.ylabel('Accuracy')
-        plt.title('Accuracy (Train, Test) over Time')
-        plt.legend()
-        plt.savefig(f"{file_path}Classifier_Accuracy.pdf")
-        
-        plt.clf()
-        plt.plot(history.history['loss'], label='Training Loss')
-        plt.plot(history.history['val_loss'], label='Testing Loss')
-        plt.xlim(left=1)
-        plt.xlabel('Epochs')
-        plt.ylabel('Accuracy')
-        plt.title('Classifier Loss (Train, Test) over Time')
-        plt.legend()
-        plt.savefig(f"{file_path}Classifier_Loss.pdf")
-
-"""
 
 def plot_metric(train, val, title, ylabel, filename, file_path, y_offset=(0.005, 0.015)):
     plt.clf()
@@ -278,18 +222,18 @@ def main():
     cross_entropy =tf.keras.losses.BinaryCrossentropy(from_logits=True)
     optimizer = tf.keras.optimizers.Adam()
 
-    
-    # train and validation data
+    '''
+    # With GRL layer
     training_generator = Seq(train_neutral_iterator, train_sel_iterators, val_mosq, True, True, batch_size=global_vars.BATCH_SIZE)
     validation_generator = Seq(None, None, val_mosq, False, True)    
     model = discriminator.create_custom_grl_model()
     history = model.fit(training_generator, validation_data=validation_generator, epochs=20, verbose = 2)
     # Plot accuracy over time (for training and validation)
     plotting(history, True)
-
+    '''
     
     # without GRL Layer
-    training_generator = Seq(train_neutral_iterator, train_sel_iterators, val_mosq, True, False, batch_size=global_vars.BATCH_SIZE)
+    training_generator = Seq(train_neutral_iterator, train_sel_iterators, None, True, False, batch_size=global_vars.BATCH_SIZE)
     validation_generator = Seq(None, None, val_mosq, False, False)
     model = discriminator.OnePopModel(train_neutral_iterator.num_samples)
     model.compile(optimizer=optimizer, loss=cross_entropy, metrics=['accuracy'])
