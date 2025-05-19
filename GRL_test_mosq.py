@@ -14,23 +14,6 @@ from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay
 import os
 
 
-'''
-generator = Generator(
-    simulation.exp,  # Simulator function
-    ["N1", "T1", "T2", "N2", "growth"],  # Parameter names
-    [198],  # Sample sizes
-    global_vars.DEFAULT_SEED  # Random seed
-)
-
-# Override default parameters with the values provided by Sara Mathieson
-generator.update_params([
-5591.367991008426,
-8989.8024202365,
-101.83233386492524,
-25459200.34194682,
-0.017934435132958317
-])
-'''
 SLIM_DATA = "../data/1000g/" 
 NEUTRAL = "neutral"
 SELECTION = ["sel_01", "sel_025", "sel_05", "sel_10"]
